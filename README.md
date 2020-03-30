@@ -9,4 +9,5 @@ make
 
 # Run
 sudo ip x monitor #allowing you to see what's happening
+
 sudo ./src/minstrel
