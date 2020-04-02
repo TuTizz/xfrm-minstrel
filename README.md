@@ -25,3 +25,7 @@ Table 1. Debugging Levels Level 	Description
 3 Repetitive events causing a flood of debugging messages
 
 4 Even less important messages
+
+# Reference
+https://gitlab.atica.um.es/gabilm.um.es/cfgipsec2
+https://spin.atomicobject.com/2016/08/26/makefile-c-projects/
