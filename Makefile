@@ -1,9 +1,12 @@
-#source : https://spin.atomicobject.com/2016/08/26/makefile-c-projects/
-
 TARGET_EXEC ?= minstrel
 
 BUILD_DIR ?= ./build
 SRC_DIRS ?= ./src
+
+LDFLAGS=-lm -lnl-xfrm-3 -lnl-3 -I /usr/include/libnl3/  
+#LDFLAGS=-lm -lnl-3 /usr/lib/x86_64-linux-gnu/libnl-xfrm-3.a /usr/include/libnl3
+
+CFLAGS=-Wall -g 
 
 SRCS := $(shell find $(SRC_DIRS) -name *.cpp -or -name *.c -or -name *.s)
 OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
@@ -25,7 +28,7 @@ $(BUILD_DIR)/%.s.o: %.s
 # c source
 $(BUILD_DIR)/%.c.o: %.c
 	$(MKDIR_P) $(dir $@)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@ $(LDFLAGS)
 
 # c++ source
 $(BUILD_DIR)/%.cpp.o: %.cpp
