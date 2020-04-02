@@ -59,8 +59,9 @@ int init_add_sp(char *src, char *dst, char *src_tunnel, char *dst_tunnel,
 }
 int main (void)
 {
+	int rc = SUCCESS;
 	if ( geteuid() != 0 ) {
-		fprintf ( stderr, "Must be root in order to execute. You are UID=%u, EUID=%u\n", getuid(), geteuid() );
+		fprintf (stderr, "Must be root in order to execute. You are UID=%u, EUID=%u\n", getuid(), geteuid() );
 		return 1;
 	}
 	//lifetime
@@ -111,9 +112,21 @@ int main (void)
 	int srcport = 40001;
 	int dstport = 40002;
 	int spi = 0x203;
-	init_add_sa(src_tunnel, dst_tunnel, spi, auth, crypto, ltime_cfg);
-	init_add_sp(src, dst, src_tunnel, dst_tunnel, srcport, dstport, ltime_cfg);
-
-
-	return 0;
+	if (0 != init_add_sa(src_tunnel, dst_tunnel, spi, auth, crypto, ltime_cfg))
+	{
+		rc = FAIL;
+		printf ("ERROR in init_add_sa\n");
+		goto cleanup;
+	}
+	if (0 != init_add_sp(src, dst, src_tunnel, dst_tunnel, srcport, dstport, ltime_cfg))
+	{
+		rc = FAIL;
+		printf ("ERROR in init_add_sp\n");
+		goto cleanup;
+	}
+	rc = SUCCESS;
+cleanup:
+	free(crypto);
+	free(auth);
+	return rc;
 }
