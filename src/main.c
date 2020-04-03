@@ -1,11 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
 
 #include "sa.h"
 #include "sp.h"
 #include "lifetime.h"
 #include "user-template.h"
 #include "selector.h"
+
+
+char *auth_key = "0123456789";
 
 int init_add_sa(char *src_tunnel, char *dst_tunnel, int spi, 
 		struct auth_params *auth, struct crypto_params *crypto, 
@@ -57,7 +61,8 @@ int init_add_sp(char *src, char *dst, char *src_tunnel, char *dst_tunnel,
 	}
 
 }
-int main (void)
+
+int init_sa_sp(char *auth_key)
 {
 	int rc = SUCCESS;
 	if ( geteuid() != 0 ) {
@@ -69,10 +74,10 @@ int main (void)
 	unsigned long long lft_byte_hard = 9999999999999;
 	unsigned long long lft_packet_soft = 9999999999999;
 	unsigned long long lft_packet_hard = 9999999999999;
-	unsigned long long lft_soft_add_expires_seconds = 9999999999999;
-	unsigned long long lft_hard_add_expires_seconds = 9999999999999;
-	unsigned long long lft_soft_use_expires_seconds = 9999999999999;
-	unsigned long long lft_hard_use_expires_seconds = 9999999999999;
+	unsigned long long lft_soft_add_expires_seconds = 3;
+	unsigned long long lft_hard_add_expires_seconds = 5;
+	unsigned long long lft_soft_use_expires_seconds = 3;
+	unsigned long long lft_hard_use_expires_seconds = 5;
 
 	struct xfrmnl_ltime_cfg* ltime_cfg = create_ltime_cfg(lft_byte_soft, 
 		lft_byte_hard, lft_packet_soft, lft_packet_hard, 
@@ -85,7 +90,7 @@ int main (void)
 	//auth
    	struct auth_params *auth = malloc(sizeof(struct auth_params));
 	auth->auth_alg_name="hmac(md5)";
-	char *auth_key = "0123456789";
+	//char *auth_key = "0123456789";
 	auth->auth_key = auth_key;
 	auth->auth_key_len = strlen(auth_key)*8;
 	auth->auth_trunc_len = strlen(auth_key)*8;
@@ -118,15 +123,79 @@ int main (void)
 		printf ("ERROR in init_add_sa\n");
 		goto cleanup;
 	}
-	if (0 != init_add_sp(src, dst, src_tunnel, dst_tunnel, srcport, dstport, ltime_cfg))
-	{
-		rc = FAIL;
-		printf ("ERROR in init_add_sp\n");
-		goto cleanup;
-	}
+	// if (0 != init_add_sp(src, dst, src_tunnel, dst_tunnel, srcport, dstport, ltime_cfg))
+	// {
+	// 	rc = FAIL;
+	// 	printf ("ERROR in init_add_sp\n");
+	// 	goto cleanup;
+	// }
 	rc = SUCCESS;
 cleanup:
 	free(crypto);
 	free(auth);
 	return rc;
+}
+
+int catch_event(int sock, struct sockaddr_nl *addr){
+	char buffer[4096];
+	int len;
+	struct  nlmsghdr *hdr;
+	struct xfrmnl_sa *result;
+	struct nl_object *a = (struct xfrmnl_sa *) result;
+	struct nl_dump_params dp = {
+		.dp_type = NL_DUMP_DETAILS,
+		.dp_fd = stdout,
+		.dp_dump_msgtype = 1,
+	};
+	perror("New event :)");
+	len = recv(sock, buffer, sizeof(buffer), 0);
+	hdr = (struct nlmsghdr *) buffer;
+	printf("nl_message_type = %d\n", hdr->nlmsg_type);
+	while (NLMSG_OK(hdr, len))
+	{
+		switch (hdr->nlmsg_type)
+		{
+			case XFRM_MSG_ACQUIRE:
+				perror("XFRM_MSG_ACQUIRE");
+				break;
+			case XFRM_MSG_EXPIRE:
+				perror("XFRM_MSG_EXPIRE");
+				//if SA still alive time to negociate into this SA
+				xfrmnl_sa_parse(hdr, &result);
+				//otherwise we still ca do it with IKE
+				nl_object_dump(a, &dp);
+				auth_key= "0123456788";
+				init_sa_sp(auth_key);
+				break;
+			case XFRM_MSG_POLEXPIRE:
+				perror("XFRM_MSG_POLEXPIRE");
+				// process_expire_sp(hdr);
+				break;
+		}
+		hdr = NLMSG_NEXT(hdr, len);
+	}
+	return 0;
+}
+
+int main (void)
+{	
+	if (0 != init_sa_sp(auth_key))
+	{
+		printf ("ERROR in init_sa_sp\n");
+	}
+	int socket_xfrm_events;
+	struct sockaddr_nl addr;
+	memset(&addr, 0, sizeof(addr));
+	addr.nl_family = AF_NETLINK;
+	socket_xfrm_events = socket(AF_NETLINK, SOCK_RAW, NETLINK_XFRM);
+	addr.nl_groups = -1;
+	if (bind(socket_xfrm_events, (struct sockaddr*)&addr, sizeof(addr))){
+		printf ("ERROR in bind\n");
+		return -1;
+	}
+	printf ("We are listening for xfrm_events\n");
+	while(1)
+		loop(socket_xfrm_events,&addr);
+	return 0;
+
 }
